@@ -1,4 +1,4 @@
-package com.example.examplemod;
+package me.digitlworld.moreinsolation;
 
 import cofh.lib.common.fluid.FluidIngredient;
 import cofh.thermal.core.util.recipes.machine.InsolatorRecipe;
@@ -7,6 +7,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.ItemTags;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Rarity;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraftforge.api.distmarker.Dist;
@@ -71,6 +72,9 @@ public class MoreInsolationMod
 
             ResourceLocation id = new ResourceLocation(MoreInsolationMod.MODID, recipeName);
 
+            ItemStack stack = new ItemStack(flower,1);
+            var rarity = flower.getRarity(stack);
+
             Ingredient inputItem = Ingredient.of(flower);
 
             FluidStack water = new FluidStack(Fluids.WATER, 1000);
@@ -79,10 +83,20 @@ public class MoreInsolationMod
             ItemStack outputItem = new ItemStack(flower, 1);
             Float outputItemChance = 2.0f;
 
-            return new InsolatorRecipe(id, 20000, 3.0f, List.of(inputItem), List.of(waterIngredient), List.of(outputItem), List.of(outputItemChance), List.of());
+            return new InsolatorRecipe(id, getFlowerEnergyFromRarity(rarity), 0.0f, List.of(inputItem), List.of(waterIngredient), List.of(outputItem), List.of(outputItemChance), List.of());
         }
 
         return null;
+    }
+
+    private int getFlowerEnergyFromRarity(Rarity rarity)
+    {
+        return switch (rarity) {
+            case COMMON -> 20000;
+            case UNCOMMON -> 30000;
+            case RARE -> 50000;
+            case EPIC -> 100000;
+        };
     }
 
     // You can use EventBusSubscriber to automatically register all static methods in the class annotated with @SubscribeEvent
