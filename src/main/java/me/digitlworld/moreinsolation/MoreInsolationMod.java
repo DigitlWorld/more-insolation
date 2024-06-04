@@ -5,11 +5,10 @@ import cofh.thermal.core.util.recipes.machine.InsolatorRecipe;
 import com.mojang.logging.LogUtils;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.ItemTags;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Rarity;
+import net.minecraft.world.item.*;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.level.material.Fluids;
+import net.minecraft.world.level.storage.loot.LootDataResolver;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.server.ServerAboutToStartEvent;
@@ -22,7 +21,11 @@ import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.registries.ForgeRegistries;
 import org.slf4j.Logger;
 
+import javax.annotation.Nullable;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 // The value here should match an entry in the META-INF/mods.toml file
 @Mod(MoreInsolationMod.MODID)
@@ -49,17 +52,75 @@ public class MoreInsolationMod
         var rm = event.getServer().getRecipeManager();
 
         var curRecipes = rm.getRecipes();
+
         curRecipes.addAll(generateFlowerRecipes());
+        curRecipes.addAll(generateSaplingRecipes());
+
         rm.replaceRecipes(curRecipes);
+    }
+
+    private List<InsolatorRecipe> generateSaplingRecipes()
+    {
+        // TODO: This is all by inference. It doesn't guarantee that a recipe will be correct.
+        //       Do better in the future.
+
+        var saplings = getItemsForTag("minecraft", "saplings");
+        var logs = getItemsForTag("minecraft", "logs");
+        var leaves = getItemsForTag("minecraft", "leaves");
+
+        if( saplings == null || logs == null || leaves == null )
+        {
+            return List.of();
+        }
+
+        List<InsolatorRecipe> generatedRecipes = new LinkedList<>();
+
+        for( var sapling : saplings.keySet() )
+        {
+            // Generate proposed log items
+            var originalSaplingPath = sapling.getPath();
+            var woodTypePrefix = originalSaplingPath.replace("_sapling", "");
+
+            var proposedLog = new ResourceLocation(sapling.getNamespace(), woodTypePrefix + "_log");
+            var proposedLeaves = new ResourceLocation(sapling.getNamespace(), woodTypePrefix + "_leaves");
+
+            if( logs.get(proposedLog) instanceof BlockItem log )
+            {
+                generatedRecipes.add( generateRecipeForSapling(saplings.get(sapling), log, null, null));
+            }
+        }
+
+        return generatedRecipes;
+    }
+
+    private @Nullable Map<ResourceLocation,Item> getItemsForTag(String namespace, String path )
+    {
+        var tagKey = ItemTags.create(new ResourceLocation(namespace, path));
+        var tags = ForgeRegistries.ITEMS.tags();
+
+        if( tags == null )
+        {
+            return null;
+        }
+
+        return tags.getTag(tagKey).stream().collect(Collectors.toMap(MoreInsolationMod::getResourceLocation, (i) -> i));
+    }
+
+    private static ResourceLocation getResourceLocation( Item item )
+    {
+        return ForgeRegistries.ITEMS.getKey(item);
     }
 
     private List<InsolatorRecipe> generateFlowerRecipes()
     {
-        var tagkey = ItemTags.create(new ResourceLocation("minecraft", "flowers"));
+        var flowers = getItemsForTag("minecraft", "flowers");
 
-        var tag = ForgeRegistries.ITEMS.tags().getTag(tagkey);
+        if( flowers == null )
+        {
+            return List.of();
+        }
 
-        return tag.stream().map(this::generateRecipeForFlower).toList();
+        return flowers.values().stream().map(this::generateRecipeForFlower).toList();
     }
 
     private InsolatorRecipe generateRecipeForFlower( Item flower )
@@ -89,13 +150,58 @@ public class MoreInsolationMod
         return null;
     }
 
+    private InsolatorRecipe generateRecipeForSapling(Item sapling, BlockItem log, BlockItem leaves, LootDataResolver lootData )
+    {
+        if(leaves != null)
+        {
+            // TODO: attempt to run loot generation for tree leaves, to generate apples/sticks/etc.
+        }
+
+        var itemLocation = ForgeRegistries.ITEMS.getKey(sapling);
+
+        if( itemLocation != null )
+        {
+            var recipeName = "insolation_recipe/" + itemLocation.getNamespace() + "/" + itemLocation.getPath();
+
+            ResourceLocation id = new ResourceLocation(MoreInsolationMod.MODID, recipeName);
+
+            ItemStack stack = new ItemStack(sapling,1);
+            var rarity = sapling.getRarity(stack);
+
+            Ingredient inputItem = Ingredient.of(sapling);
+
+            FluidStack water = new FluidStack(Fluids.WATER, 1000);
+            FluidIngredient waterIngredient = FluidIngredient.of(water);
+
+            ItemStack outputItemLog = new ItemStack(log, 1);
+            Float outputItemLogChance = 6.0f;
+
+            ItemStack outputItemSapling = new ItemStack(sapling, 1);
+            Float outputItemSaplingChance = 1.1f;
+
+            return new InsolatorRecipe(id, getSaplingEnergyFromRarity(rarity), 0.0f, List.of(inputItem), List.of(waterIngredient), List.of(outputItemLog, outputItemSapling), List.of(outputItemLogChance, outputItemSaplingChance), List.of());
+        }
+
+        return null;
+    }
+
     private int getFlowerEnergyFromRarity(Rarity rarity)
     {
         return switch (rarity) {
             case COMMON -> 20000;
             case UNCOMMON -> 30000;
             case RARE -> 50000;
-            case EPIC -> 100000;
+            case EPIC -> 80000;
+        };
+    }
+
+    private int getSaplingEnergyFromRarity(Rarity rarity)
+    {
+        return switch (rarity) {
+            case COMMON -> 60000;
+            case UNCOMMON -> 75000;
+            case RARE -> 100000;
+            case EPIC -> 150000;
         };
     }
 
