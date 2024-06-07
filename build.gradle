@@ -9,7 +9,7 @@ plugins {
 
 gitVersion {
     versionTagPrefix = 'v'
-    versionTagPattern = '\\d+.\\d+.\\d+\\-\\s+'
+    versionTagPattern = '(\\d+.\\d+.\\d+\\-.+)'
 }
 
 // version = mod_version
