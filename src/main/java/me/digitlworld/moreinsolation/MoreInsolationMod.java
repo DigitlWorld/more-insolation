@@ -5,6 +5,7 @@ import cofh.thermal.core.util.recipes.machine.InsolatorRecipe;
 import com.mojang.logging.LogUtils;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.ItemTags;
+import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.*;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.level.material.Fluids;
@@ -26,6 +27,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 // The value here should match an entry in the META-INF/mods.toml file
 @Mod(MoreInsolationMod.MODID)
@@ -55,6 +57,7 @@ public class MoreInsolationMod
 
         curRecipes.addAll(generateFlowerRecipes());
         curRecipes.addAll(generateSaplingRecipes());
+        curRecipes.addAll(generateCropSeedRecipes());
 
         rm.replaceRecipes(curRecipes);
     }
@@ -91,6 +94,113 @@ public class MoreInsolationMod
         }
 
         return generatedRecipes;
+    }
+
+    private List<InsolatorRecipe> generateCropSeedRecipes()
+    {
+        // TODO: This is all by inference. It doesn't guarantee that a recipe will be correct.
+        //       Do better in the future.
+
+        var crops = getItemsForTag("forge", "crops");
+        var seeds = getItemsForTag("forge", "seeds");
+
+        if( seeds == null || crops == null )
+        {
+            return List.of();
+        }
+
+        List<InsolatorRecipe> generatedRecipes = new LinkedList<>();
+
+        for( var crop : crops.keySet() )
+        {
+            var cropItem = crops.get(crop);
+
+            var tags = getItemTags( cropItem );
+
+            var cropString = PathMethods.matchAndReturnTSuffix( tags, "forge", "crops" );
+
+            if( cropString != null )
+            {
+                var potentialSeedLocation = new ResourceLocation("forge", "seeds/" + cropString );
+
+                var seedItem = seeds.values().stream().filter( item -> {
+                    var itemTags = getItemTags(item);
+                    return itemTags.filter(tk -> {
+                        var tagLocation = tk.location();
+                        return tagLocation.getNamespace().equals(potentialSeedLocation.getNamespace())
+                                && tagLocation.getPath().equals(potentialSeedLocation.getPath());
+                    }).count() == 1;
+                }).findFirst();
+
+                if( seedItem.isPresent() )
+                {
+                    generatedRecipes.add( generateCropWithSeedRecipe(cropItem, seedItem.get() ) );
+                }
+                else
+                {
+                    generatedRecipes.add( generateCropSelfRecipe( cropItem ) );
+                }
+            }
+        }
+
+        return generatedRecipes;
+    }
+
+    private InsolatorRecipe generateCropSelfRecipe( Item cropItem )
+    {
+        var itemLocation = ForgeRegistries.ITEMS.getKey(cropItem);
+
+        if( itemLocation != null )
+        {
+            var recipeName = "insolation_recipe/" + itemLocation.getNamespace() + "/" + itemLocation.getPath();
+
+            ResourceLocation id = new ResourceLocation(MoreInsolationMod.MODID, recipeName);
+
+            ItemStack stack = new ItemStack(cropItem,1);
+            var rarity = cropItem.getRarity(stack);
+
+            Ingredient inputItem = Ingredient.of(cropItem);
+
+            FluidStack water = new FluidStack(Fluids.WATER, 1000);
+            FluidIngredient waterIngredient = FluidIngredient.of(water);
+
+            ItemStack outputItem = new ItemStack(cropItem, 1);
+            Float outputItemChance = 2.5f;
+
+            return new InsolatorRecipe(id, getFlowerEnergyFromRarity(rarity), 0.0f, List.of(inputItem), List.of(waterIngredient), List.of(outputItem), List.of(outputItemChance), List.of());
+        }
+
+        return null;
+    }
+
+    private InsolatorRecipe generateCropWithSeedRecipe( Item cropItem, Item seedItem )
+    {
+        var itemLocation = ForgeRegistries.ITEMS.getKey(seedItem);
+
+        if( itemLocation != null )
+        {
+            var recipeName = "insolation_recipe/" + itemLocation.getNamespace() + "/" + itemLocation.getPath();
+
+            ResourceLocation id = new ResourceLocation(MoreInsolationMod.MODID, recipeName);
+
+            ItemStack stack = new ItemStack(seedItem,1);
+            var rarity = seedItem.getRarity(stack);
+
+            Ingredient inputItem = Ingredient.of(seedItem);
+
+            FluidStack water = new FluidStack(Fluids.WATER, 1000);
+            FluidIngredient waterIngredient = FluidIngredient.of(water);
+
+            ItemStack outputCrop = new ItemStack(cropItem, 1);
+            Float outputCropChance = 2.0f;
+
+            ItemStack outputSeed = new ItemStack(seedItem, 1);
+            Float outputSeedChance = 1.1f;
+
+            return new InsolatorRecipe(id, getFlowerEnergyFromRarity(rarity), 0.0f, List.of(inputItem), List.of(waterIngredient), List.of(outputCrop, outputSeed), List.of(outputCropChance,outputSeedChance), List.of());
+        }
+
+        return null;
     }
 
     private @Nullable Map<ResourceLocation,Item> getItemsForTag(String namespace, String path )
@@ -185,6 +295,11 @@ public class MoreInsolationMod
         return null;
     }
 
+    private static Stream<TagKey<Item>> getItemTags(Item toGet)
+    {
+        return ForgeRegistries.ITEMS.tags().getReverseTag(toGet).orElseThrow().getTagKeys();
+    }
+
     private int getFlowerEnergyFromRarity(Rarity rarity)
     {
         return switch (rarity) {
@@ -216,3 +331,4 @@ public class MoreInsolationMod
         }
     }
 }
+
