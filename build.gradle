@@ -4,9 +4,15 @@ plugins {
     id 'maven-publish'
     id 'net.minecraftforge.gradle' version '[6.0,6.2)'
     id 'org.parchmentmc.librarian.forgegradle' version '1.+'
+    id 'com.olafmertens.git-version' version '0.1.1'
 }
 
-version = mod_version
+gitVersion {
+    versionTagPrefix = 'v'
+    versionTagPattern = '\\d+.\\d+.\\d+\\-\\s+'
+}
+
+// version = mod_version
 group = mod_group_id
 
 base {
