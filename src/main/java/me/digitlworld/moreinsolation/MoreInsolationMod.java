@@ -59,7 +59,9 @@ public class MoreInsolationMod
 
         generatedRecipes.addAll(generateFlowerRecipes());
         generatedRecipes.addAll(generateSaplingRecipes());
-        generatedRecipes.addAll(generateCropSeedRecipes());
+
+        // TODO: Currently crashes server with farmersdelight:rice. Not sure why.
+        //generatedRecipes.addAll(generateCropSeedRecipes());
 
         var curRecipes = rm.getRecipes();
         var currentInsolatorRecipes = curRecipes.stream().filter( r -> r instanceof InsolatorRecipe )
