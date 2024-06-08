@@ -20,9 +20,11 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.registries.ForgeRegistries;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 
 import javax.annotation.Nullable;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -53,11 +55,22 @@ public class MoreInsolationMod
 
         var rm = event.getServer().getRecipeManager();
 
-        var curRecipes = rm.getRecipes();
+        var generatedRecipes = new LinkedList<InsolatorRecipe>();
 
-        curRecipes.addAll(generateFlowerRecipes());
-        curRecipes.addAll(generateSaplingRecipes());
-        curRecipes.addAll(generateCropSeedRecipes());
+        generatedRecipes.addAll(generateFlowerRecipes());
+        generatedRecipes.addAll(generateSaplingRecipes());
+        generatedRecipes.addAll(generateCropSeedRecipes());
+
+        var curRecipes = rm.getRecipes();
+        var currentInsolatorRecipes = curRecipes.stream().filter( r -> r instanceof InsolatorRecipe )
+                                                         .flatMap( r -> ((InsolatorRecipe)r).getInputItems().stream() )
+                                                         .map( i -> getItemNameTag( getItemFromIngredient( i ) ) )
+                                                         .collect(Collectors.toSet());
+
+        var newRecipes = generatedRecipes.stream().collect( Collectors.toMap( MoreInsolationMod::getInputItemNameFromRecipe, i -> i ) );
+
+        var newRecipesToAdd = newRecipes.keySet().stream().filter( k -> !currentInsolatorRecipes.contains( k ) ).map(newRecipes::get);
+        curRecipes.addAll(newRecipesToAdd.toList());
 
         rm.replaceRecipes(curRecipes);
     }
@@ -168,6 +181,36 @@ public class MoreInsolationMod
             Float outputItemChance = 2.5f;
 
             return new InsolatorRecipe(id, getFlowerEnergyFromRarity(rarity), 0.0f, List.of(inputItem), List.of(waterIngredient), List.of(outputItem), List.of(outputItemChance), List.of());
+        }
+
+        return null;
+    }
+
+    private static @Nullable String getItemNameTag( @NotNull Item item )
+    {
+        var itemLocation = ForgeRegistries.ITEMS.getKey(item);
+
+        if( itemLocation == null )
+        {
+            return null;
+        }
+
+        return itemLocation.toString();
+    }
+
+    private static Item getItemFromIngredient( Ingredient ingredient )
+    {
+        var item = Arrays.stream(ingredient.getItems()).findFirst();
+        return item.map(ItemStack::getItem).orElse(null);
+    }
+
+    private static String getInputItemNameFromRecipe(InsolatorRecipe recipe)
+    {
+        var item = recipe.getInputItems().stream().findFirst().map( MoreInsolationMod::getItemFromIngredient ).orElse(null);
+
+        if( item != null )
+        {
+            return getItemNameTag(item);
         }
 
         return null;
