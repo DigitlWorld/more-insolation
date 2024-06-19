@@ -1,6 +1,7 @@
 package me.digitlworld.moreinsolation;
 
 import cofh.lib.common.fluid.FluidIngredient;
+import cofh.thermal.core.util.managers.machine.InsolatorRecipeManager;
 import cofh.thermal.core.util.recipes.machine.InsolatorRecipe;
 import com.mojang.logging.LogUtils;
 import net.minecraft.resources.ResourceLocation;
@@ -71,10 +72,14 @@ public class MoreInsolationMod
 
         var newRecipes = generatedRecipes.stream().collect( Collectors.toMap( MoreInsolationMod::getInputItemNameFromRecipe, i -> i ) );
 
-        var newRecipesToAdd = newRecipes.keySet().stream().filter( k -> !currentInsolatorRecipes.contains( k ) ).map(newRecipes::get);
-        curRecipes.addAll(newRecipesToAdd.toList());
+        var newRecipesToAdd = newRecipes.keySet().stream().filter( k -> !currentInsolatorRecipes.contains( k ) ).map(newRecipes::get).toList();
+        curRecipes.addAll(newRecipesToAdd);
 
         rm.replaceRecipes(curRecipes);
+
+        for( var newRecipe : newRecipesToAdd ) {
+            InsolatorRecipeManager.instance().addRecipe(newRecipe);
+        }
     }
 
     private List<InsolatorRecipe> generateSaplingRecipes()
